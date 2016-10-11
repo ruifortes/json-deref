@@ -1,0 +1,5 @@
+{
+  "a": "self_A",
+  "b": {"$ref": "external_circular-file.json#b/a"},
+  "c": {"$ref": "external_circular-file-self.json#a"}
+}

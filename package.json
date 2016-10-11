@@ -1,0 +1,30 @@
+{
+  "name": "json-deref",
+  "version": "1.0.1",
+  "description": "Parses json-references",
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "babel index.js -d lib --no-comments",
+    "test": "tap test/*.js || true"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ruifortes/json-deref.git"
+  },
+  "keywords": [
+    "json",
+    "deref",
+    "json-schema"
+  ],
+  "author": "ruisantosfortes@gmail.com",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ruifortes/json-deref/issues"
+  },
+  "homepage": "https://github.com/ruifortes/json-deref#readme",
+  "devDependencies": {
+    "babel-cli": "^6.16.0",
+    "babel-preset-es2015": "^6.16.0",
+    "tap": "^7.1.2"
+  }
+}

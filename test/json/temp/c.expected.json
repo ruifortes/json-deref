@@ -1,0 +1,19 @@
+{
+  "a": {
+    "a": {
+      "a": "val aaa",
+      "b": {
+        "a": "val aaba",
+        "b": "val aaa",
+        "c": "val aaba",
+        "d": "val aac"
+      },
+      "c": "val aac"
+    },
+    "b": "val ba"
+  },
+  "b": {
+    "a": "val ba",
+    "b": "val bb"
+  }
+}

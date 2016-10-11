@@ -1,0 +1,22 @@
+{
+  "title": "external definitions test",
+  "properties": {
+    "id": {
+      "$ref": "#/definitions/id"
+    },
+    "home-email": {
+      "$ref": "#/definitions/email"
+    },
+    "work-email": {
+      "$ref": "#/definitions/email"
+    }
+  },
+  "definitions": {
+    "id": {
+      "$ref": "defs/common-definitions.json#definitions/id"
+    },
+    "email" : {
+      "$ref": "defs/common-definitions.json#definitions/email"
+    }
+  }
+}
