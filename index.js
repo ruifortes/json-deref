@@ -49,7 +49,7 @@ function deref(json, options, pointer = ''){
   if(options.externalLoader && typeof options.externalLoader !== 'function') throw new Error('options.externalLoader must be a function')
 
   // local instance of resource cache object
-  var jsonCache
+  const jsonCache = {}
 
   var defaultLoaders = {
     web: url => {
@@ -76,17 +76,15 @@ function deref(json, options, pointer = ''){
     }
   }
 
-
   // If 'json' is a string assume an URI.
   return ( typeof json !== 'object'
     ? getJsonResource(json, {})
-    : Promise.resolve({raw: json, parsed: Array.isArray(json) ? [] : {}})
+    : Promise.resolve(Object.assign(jsonCache, {raw: json, parsed: Array.isArray(json) ? [] : {}}))
   )
   .then(({raw, parsed}) => {
-
     // add json, options.jsonResources eventually the global cache
-    jsonCache = Object.assign(
-      {json: {raw, parsed}},
+    Object.assign(
+      jsonCache,
       options.jsonResources,
       (options.cache ? resourceCache : {})
     )

@@ -141,5 +141,9 @@ Derefs <code>$ref</code>'s in JSON to actual resolved values. Supports local, fi
 | options | <code>Object</code> | options |
 | options.baseFolder | <code>String</code> | the base folder to get relative path files from. Default is <code>process.cwd()</code> |
 | options.cache | <code>String</code> | whether to cache the result from the request. Default: <code>true</code>. |
+| options.requireStartSlash | <code>boolean</code> | If set requires json-pointer start slash. Default: <code>false</code>. |
+| options.localLoader | <code>function</code> | local pointer loader function with signature <code>function (pointer, params, defaultLoader)</code>. <code>pointer</code> - is the local json-pointer. <code>params</code> - params is the json-reference object without the <code>$ref</code> property. <code>defaultLoader</code> - defaultLoader function accepts a json-pointer string and retrieves the parsed target.|
+| options.externalLoader | <code>function</code> | external reference loader function with signature <code>function (url, params, defaultLoader)</code>. works similar to localLoader but with the url part of <code>$ref</code>|
 | options.failOnMissing | <code>Boolean</code> | By default missing / unresolved refs will be left as is with their ref value intact. If set to <code>true</code> we will error out on first missing ref that we cannot resolve. Default: <code>false</code>. |
 | options.externalOnly | <code>Boolean</code> | By default missing / unresolved refs will be left as is with their ref value intact. If set to <code>true</code> we will error out on first missing ref that we cannot resolve. Default: <code>false</code>. |
+| options.jsonResources | <code>Object</code> | object containing json reources accesible with <code>{"#ref": "json:[key]#definitions/email"}</code> |
