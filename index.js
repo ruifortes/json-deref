@@ -9,10 +9,10 @@ if (process.env.BABEL_ENV === "node") {
 // TODO invalidate cache after TTL
 var resourceCache = {}
 
-const defaultOptions = {
+var defaultOptions = {
   cache: true,
   cacheTTL: 300000, // ms
-  basePath: process.cwd(),
+  // basePath: process.cwd(),
   failOnMissing: false,
   externalOnly: false,
   requireStartSlash: false,
@@ -20,6 +20,8 @@ const defaultOptions = {
   externalLoader: undefined,
   jsonResources: {}
 }
+
+// if (process.env.BABEL_ENV === "node") defaultOptions.basePath = process.cwd()
 
 //Utility methods
 function isCircular(pointer, refChain){

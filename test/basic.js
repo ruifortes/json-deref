@@ -3,7 +3,8 @@ var test = tap.test
 
 var fs = require('fs')
 
-var deref = require('../lib/index.js').default
+// var deref = require('../lib/index.js').default
+var deref = require('../lib/jsonDeref_node.js').default
 
 // var list = fs.readdirSync('./test/json')
 //   .filter(f => f[0] !== '_' && f.indexOf('.expected.') === -1)

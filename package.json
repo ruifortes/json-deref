@@ -1,8 +1,12 @@
 {
   "name": "json-deref",
-  "version": "1.0.5",
+  "version": "1.0.8",
   "description": "Parses json-references",
   "main": "lib/jsonDeref_node.js",
+  "files": [
+    "lib/",
+    "index.js"
+  ],
   "scripts": {
     "build": "npm run build:node && npm run build:browser",
     "build:node": "cross-env BABEL_ENV=node babel index.js -o lib/jsonDeref_node.js --no-comments",
