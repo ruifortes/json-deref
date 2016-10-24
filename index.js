@@ -91,19 +91,6 @@ function deref(json, options, pointer = ''){
       (options.cache ? resourceCache : {})
     )
 
-    // // If options.cache = true shallow clone add global resourceCache
-    // if(options.cache){
-    //   jsonCache = Object.assign(jsonCache, resourceCache)
-    // }
-
-
-    // // If options.cache = true shallow clone resourceCache else create one time empty cache
-    // if(options.cache){
-    //   jsonCache = Object.assign({json: {raw, parsed}}, resourceCache)
-    // } else {
-    //   jsonCache = {json: {raw, parsed}}
-    // }
-
     return processJson(raw, parsed, 0, pointer, {}, [])
   })
 
