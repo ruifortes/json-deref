@@ -1,6 +1,10 @@
-import fs from 'fs'
-import Path from 'path'
-// import Url from 'url'
+// import fs from 'fs'
+// import path from 'path'
+if (process.env.BABEL_ENV === "node") {
+  var fs = require('fs')
+  var path = require('path')
+  var fetch = require('isomorphic-fetch')
+}
 
 // TODO invalidate cache after TTL
 var resourceCache = {}
@@ -13,7 +17,8 @@ const defaultOptions = {
   externalOnly: false,
   requireStartSlash: false,
   localLoader: undefined,
-  externalLoader: undefined
+  externalLoader: undefined,
+  jsonResources: {}
 }
 
 //Utility methods
@@ -22,7 +27,6 @@ function isCircular(pointer, refChain){
     return backRef.startsWith(pointer) && backRef !== pointer
   })
 }
-
 
 
 /**
@@ -35,7 +39,6 @@ function isCircular(pointer, refChain){
   * @param {string} [pointer=''] - A json-pointer. If provided only parses refered part of the document
   */
 function deref(json, options, pointer = ''){
-  debugger
   // apply options defaults
   options =  Object.assign({}, defaultOptions, options)
 
@@ -46,30 +49,62 @@ function deref(json, options, pointer = ''){
   // local instance of resource cache object
   var jsonCache
 
-  // If 'json' is a string asume an URI.
+  var defaultLoaders = {
+    web: url => {
+      return fetch(url).then(res => {
+        return res.text()
+      })
+      .then(data => {
+        return JSON.parse(data)
+      })
+    },
+    json: url => {
+      return jsonCache[url]
+    }
+  }
+
+  if (process.env.BABEL_ENV === "node") {
+    defaultLoaders.file = function (url) {
+      return new Promise((accept, reject) => {
+        fs.readFile(path.resolve(options.basePath, url), 'utf8', (err,data) => {
+          if (err) throw err
+          accept(JSON.parse(data))
+        })
+      })
+    }
+  }
+
+
+  // If 'json' is a string assume an URI.
   return ( typeof json !== 'object'
     ? getJsonResource(json, {})
     : Promise.resolve({raw: json, parsed: Array.isArray(json) ? [] : {}})
   )
   .then(({raw, parsed}) => {
-    // If options.cache = true shallow clone resourceCache else create one time empty cache
-    if(options.cache){
-      jsonCache = Object.assign({json: {raw, parsed}}, resourceCache)
-    } else {
-      jsonCache = {json: {raw, parsed}}
-    }
+
+    // add json, options.jsonResources eventually the global cache
+    jsonCache = Object.assign(
+      {json: {raw, parsed}},
+      options.jsonResources,
+      (options.cache ? resourceCache : {})
+    )
+
+    // // If options.cache = true shallow clone add global resourceCache
+    // if(options.cache){
+    //   jsonCache = Object.assign(jsonCache, resourceCache)
+    // }
+
+
+    // // If options.cache = true shallow clone resourceCache else create one time empty cache
+    // if(options.cache){
+    //   jsonCache = Object.assign({json: {raw, parsed}}, resourceCache)
+    // } else {
+    //   jsonCache = {json: {raw, parsed}}
+    // }
+
     return processJson(raw, parsed, 0, pointer, {}, [])
   })
 
-
-  function fileLoader(url) {
-    return new Promise((accept, reject) => {
-      fs.readFile(Path.resolve(options.basePath, url), 'utf8', (err,data) => {
-        if (err) throw err
-        accept(data)
-      })
-    })
-  }
 
   /**
    * Gets raw and parsed json from cache or external resourceCache
@@ -89,14 +124,24 @@ function deref(json, options, pointer = ''){
         // accept(Object.assign({}, cached, {resourceId: index}))
       } else {
         // TODO get apropriate loader based on url.
-        const defaultLoader = fileLoader
+        let defaultLoader
+
+        if(url.startsWith('http://') || url.startsWith('https://')) {
+          defaultLoader = defaultLoaders.web
+        }
+        else if(url.startsWith('json:')) {
+          defaultLoader = defaultLoaders.file
+        }
+        else if(process.env.BABEL_ENV === "node") {
+          defaultLoader = defaultLoaders.file
+        }
 
         return (options.externalLoader
           ? options.externalLoader(url, params, defaultLoader)
           : defaultLoader(url)
         )
-        .then(data => {
-          cached = jsonCache[url] = {raw: JSON.parse(data) , parsed: {}}
+        .then(json => {
+          cached = jsonCache[url] = {raw: json , parsed: {}}
           accept({...cached, resourceId: keys.length})
           // accept(Object.assign({}, cached, {resourceId: keys.length}))
         })
@@ -297,4 +342,10 @@ function deref(json, options, pointer = ''){
 
 }
 
-export default deref
+
+// export default deref
+if (process.env.BABEL_ENV === "node") {
+  exports.default = deref
+} else {
+  window.jsonDeref = deref
+}
