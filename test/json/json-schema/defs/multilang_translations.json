@@ -1,0 +1,13 @@
+{
+  "title" : {
+    "en": "multi language test",
+    "pt": "multilang test",
+    "fr": "essai multi-langue",
+    "de": "Multi-Sprachtest"
+  },
+  "title2" : {
+    "pt": "multilang test",
+    "fr": "essai multi-langue",
+    "de": "Multi-Sprachtest"
+  }
+}

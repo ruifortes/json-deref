@@ -11,7 +11,9 @@ const defaultOptions = {
   basePath: process.cwd(),
   failOnMissing: false,
   externalOnly: false,
-  requireStartSlash: false
+  requireStartSlash: false,
+  localLoader: undefined,
+  externalLoader: undefined
 }
 
 //Utility methods
@@ -20,6 +22,8 @@ function isCircular(pointer, refChain){
     return backRef.startsWith(pointer) && backRef !== pointer
   })
 }
+
+
 
 /**
   * Entry point. Scopes resource cache
@@ -35,12 +39,16 @@ function deref(json, options, pointer = ''){
   // apply options defaults
   options =  Object.assign({}, defaultOptions, options)
 
+  // validate options
+  if(options.localLoader && typeof options.localLoader !== 'function') throw new Error('options.localLoader must be a function')
+  if(options.externalLoader && typeof options.externalLoader !== 'function') throw new Error('options.externalLoader must be a function')
+
   // local instance of resource cache object
   var jsonCache
 
   // If 'json' is a string asume an URI.
   return ( typeof json !== 'object'
-    ? getJsonResource(json)
+    ? getJsonResource(json, {})
     : Promise.resolve({raw: json, parsed: Array.isArray(json) ? [] : {}})
   )
   .then(({raw, parsed}) => {
@@ -50,9 +58,18 @@ function deref(json, options, pointer = ''){
     } else {
       jsonCache = {json: {raw, parsed}}
     }
-    return processJson(raw, parsed, 0, pointer, [])
+    return processJson(raw, parsed, 0, pointer, {}, [])
   })
 
+
+  function fileLoader(url) {
+    return new Promise((accept, reject) => {
+      fs.readFile(Path.resolve(options.basePath, url), 'utf8', (err,data) => {
+        if (err) throw err
+        accept(data)
+      })
+    })
+  }
 
   /**
    * Gets raw and parsed json from cache or external resourceCache
@@ -61,26 +78,33 @@ function deref(json, options, pointer = ''){
    * @returns  {Object}
    *           Returns an object containing ray, parsed and id
    */
-  function getJsonResource(url) {
+  function getJsonResource(url, params) {
     return new Promise((accept,reject) => {
       const keys = Object.getOwnPropertyNames(jsonCache)
       const index = keys.indexOf(url)
       let cached = jsonCache[url]
 
       if (cached) {
-        // accept({...jsonCache[url], resourceId: index}) // error on spread operator using object[key] form
-        // accept({...cached, resourceId: index})
-        accept(Object.assign({}, cached, {resourceId: index}))
+        accept({...cached, resourceId: index})
+        // accept(Object.assign({}, cached, {resourceId: index}))
       } else {
-        fs.readFile(Path.resolve(options.basePath, url), 'utf8', (err,data) => {
-          if (err) throw err
+        // TODO get apropriate loader based on url.
+        const defaultLoader = fileLoader
+
+        return (options.externalLoader
+          ? options.externalLoader(url, params, defaultLoader)
+          : defaultLoader(url)
+        )
+        .then(data => {
           cached = jsonCache[url] = {raw: JSON.parse(data) , parsed: {}}
-          // accept({...cached, resourceId: keys.length})
-          accept(Object.assign({}, cached, {resourceId: keys.length}))
+          accept({...cached, resourceId: keys.length})
+          // accept(Object.assign({}, cached, {resourceId: keys.length}))
         })
+
       }
     })
   }
+
 
   /**
     * This function mainly serves to scope a single json resource
@@ -91,9 +115,13 @@ function deref(json, options, pointer = ''){
     * @param {string} pointer - Reference chain used to catch circular references
     * @param {string[]} refChain - Reference chain used to catch circular references
     */
-  function processJson(rawJson, parsedJson = {}, resourceId, pointer, refChain) {
+  function processJson(rawJson, parsedJson = {}, resourceId, pointer, params, refChain) {
 
-    return solveReference(pointer, refChain)
+    if(options.localLoader){
+      return options.localLoader(pointer, params, solveReference.bind(this, refChain))
+    } else {
+      return solveReference(refChain, pointer)
+    }
 
     /**
       * Main recursive traverse function
@@ -140,21 +168,25 @@ function deref(json, options, pointer = ''){
               nextProp()
             }
             // prop is a reference
-            else if(sourceValue.$ref) {
-              Promise.resolve(sourceValue.$ref.split('#'))
-              .then(([ref, pointer = '']) => {
-                const branchRefChain = [...refChain, propCursor]
-                if(ref) {
-                  return getJsonResource(ref)
-                  .then(({raw, parsed, resourceId}) => {
-                    return processJson(raw, parsed, resourceId, pointer, branchRefChain)
-                  })
+            else if(sourceValue.hasOwnProperty('$ref')) {
+              const {$ref, ...params} = sourceValue
+              const [url, pointer = ''] = $ref.split('#')
+              const branchRefChain = [...refChain, propCursor]
+
+              Promise.resolve()
+              .then(() => {
+                if(url) {
+                  return getJsonResource(url, params)
                 } else {
-                  if (options.externalOnly) {
-                    return sourceValue
-                  } else {
-                    return solveReference(pointer, branchRefChain)
-                  }
+                  return {raw: rawJson, parsed: parsedJson, resourceId}
+                }
+              })
+              .then(({raw, parsed, resourceId}) => {
+                if(!url && options.externalOnly){
+                  return sourceValue
+                } else {
+                  // return processJson(raw, parsed, resourceId, pointer, branchRefChain)
+                  return processJson(raw, parsed, resourceId, pointer, params, branchRefChain)
                 }
               })
               .then(newValue => {
@@ -190,7 +222,6 @@ function deref(json, options, pointer = ''){
     }
 
 
-
     /**
       * Resolves a reference and pointer and returns the result.
       * State is updates in the recursion but result must be explicitly added.
@@ -201,9 +232,7 @@ function deref(json, options, pointer = ''){
       * @param {string[]} refChain - Parent pointers used to check circular references
       *
       */
-    // function solveReference(refObj, refChain) {
-    //   const [ref, pointer = ''] = refObj.$ref.split('#')
-    function solveReference(pointer, refChain) {
+    function solveReference(refChain, pointer) {
 
       // normalize pointer starting slash
       if(!options.requireStartSlash && pointer && !pointer.startsWith('/')) {

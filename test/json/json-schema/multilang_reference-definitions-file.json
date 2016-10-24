@@ -1,0 +1,27 @@
+{
+  "title": {"$ref": "defs/multilang_translations.json#lang:title"},
+  "title2": {"$ref": "defs/multilang_translations.json#title", "lang":true},
+  "title3": {
+    "en": "multi language test",
+    "$ref": "defs/multilang_translations.json#lang:title2"
+  },
+  "properties": {
+    "id": {
+      "$ref": "#/definitions/id"
+    },
+    "home-email": {
+      "$ref": "#/definitions/email"
+    },
+    "work-email": {
+      "$ref": "#/definitions/email"
+    }
+  },
+  "definitions": {
+    "id": {
+      "$ref": "defs/multilang_common-definitions.json#definitions/id"
+    },
+    "email" : {
+      "$ref": "defs/multilang_common-definitions.json#definitions/email"
+    }
+  }
+}
