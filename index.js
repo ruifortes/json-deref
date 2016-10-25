@@ -21,14 +21,24 @@ var defaultOptions = {
   jsonResources: {}
 }
 
-// if (process.env.BABEL_ENV === "node") defaultOptions.basePath = process.cwd()
+if (process.env.BABEL_ENV === "node") defaultOptions.basePath = process.cwd()
 
 //Utility methods
 function isCircular(pointer, refChain){
   return refChain.some(backRef => {
-    return backRef.startsWith(pointer) && backRef !== pointer
+    // return backRef.startsWith(pointer) && backRef !== pointer
+    return backRef.startsWith(pointer)
   })
 }
+
+function splitRef($ref) {
+  let [url, pointer = ''] = $ref.split('#')
+  if (pointer && !pointer.startsWith('/')) {
+    pointer = '/' + pointer
+  }
+  return [url, pointer]
+}
+
 
 
 /**
@@ -60,15 +70,20 @@ function deref(json, options, pointer = ''){
         return JSON.parse(data)
       })
     },
-    json: url => {
-      return jsonCache[url]
+    json: key => {
+      key = key.substring(5)
+      if(options.jsonResources.hasOwnProperty(key)){
+        return Promise.resolve(options.jsonResources[key])
+      } else {
+        throw new Error(`can't find ${key}`)
+      }
     }
   }
 
   if (process.env.BABEL_ENV === "node") {
-    defaultLoaders.file = function (url) {
+    defaultLoaders.file = url => {
       return new Promise((accept, reject) => {
-        fs.readFile(path.resolve(options.basePath, url), 'utf8', (err,data) => {
+        fs.readFile(path.resolve(options.basePath, url), 'utf8', (err, data) => {
           if (err) throw err
           accept(JSON.parse(data))
         })
@@ -76,16 +91,33 @@ function deref(json, options, pointer = ''){
     }
   }
 
-  // If 'json' is a string assume an URI.
-  return ( typeof json !== 'object'
-    ? getJsonResource(json, {})
-    : Promise.resolve(Object.assign(jsonCache, {raw: json, parsed: Array.isArray(json) ? [] : {}}))
-  )
+  // // If 'json' is a string assume an URI.
+  // return ( typeof json !== 'object'
+  //   ? getJsonResource(json, {})
+  //   // : Promise.resolve(Object.assign(jsonCache, {json: {raw: json, parsed: Array.isArray(json) ? [] : {}}}))
+  //   : Promise.resolve(json)
+  // )
+  return Promise.resolve()
+  .then(() => {
+    if(typeof json === 'string'){
+      return getJsonResource(json, {})
+    } else if(typeof json === 'object'){
+      Object.assign(jsonCache, {json: {raw: json, parsed: Array.isArray(json) ? [] : {}}})
+      return jsonCache.json
+    } else {
+      throw new Error('Invalid param. Must be object, array or string')
+    }
+  })
   .then(({raw, parsed}) => {
+    let jsonResourcesObject = {}
+    Object.getOwnPropertyNames(options.jsonResources).forEach(key => {
+      jsonResourcesObject[key] = {raw: options.jsonResources[key], parsed:{} }
+    })
+
     // add json, options.jsonResources eventually the global cache
     Object.assign(
       jsonCache,
-      options.jsonResources,
+      jsonResourcesObject,
       (options.cache ? resourceCache : {})
     )
 
@@ -115,11 +147,9 @@ function deref(json, options, pointer = ''){
 
         if(url.startsWith('http://') || url.startsWith('https://')) {
           defaultLoader = defaultLoaders.web
-        }
-        else if(url.startsWith('json:')) {
-          defaultLoader = defaultLoaders.file
-        }
-        else if(process.env.BABEL_ENV === "node") {
+        } else if(url.startsWith('json:')) {
+          defaultLoader = defaultLoaders.json
+        } else if(process.env.BABEL_ENV === "node") {
           defaultLoader = defaultLoaders.file
         }
 
@@ -202,7 +232,8 @@ function deref(json, options, pointer = ''){
             // prop is a reference
             else if(sourceValue.hasOwnProperty('$ref')) {
               const {$ref, ...params} = sourceValue
-              const [url, pointer = ''] = $ref.split('#')
+              // let [url, pointer = ''] = $ref.split('#')
+              const [url, pointer = ''] = splitRef($ref)
               const branchRefChain = [...refChain, propCursor]
 
               Promise.resolve()
@@ -217,7 +248,10 @@ function deref(json, options, pointer = ''){
                 if(!url && options.externalOnly){
                   return sourceValue
                 } else {
-                  // return processJson(raw, parsed, resourceId, pointer, branchRefChain)
+                  let ref = `${resourceId}#${pointer}`
+                  if(isCircular(ref, [propCursor]) || singleProp && isCircular(ref, refChain)) {
+                    throw new Error(`pointer ${ref} is circular`)
+                  }
                   return processJson(raw, parsed, resourceId, pointer, params, branchRefChain)
                 }
               })
@@ -265,23 +299,12 @@ function deref(json, options, pointer = ''){
       *
       */
     function solveReference(refChain, pointer) {
-
-      // normalize pointer starting slash
-      if(!options.requireStartSlash && pointer && !pointer.startsWith('/')) {
-        pointer = '/' + pointer
-      }
-
-      console.log(`solveReference ${resourceId + pointer} with refChain ${refChain}`)
-
       // cursor is updated in pointer prop iteration and passed to processNode
-      let cursor = resourceId + ':'
-      const newRefChain = [...refChain, `${resourceId}:${pointer}`]
+      let cursor = resourceId + '#'
 
-      if(isCircular(cursor + pointer, refChain)) {
-        throw new Error(`pointer ${pointer} is circular`)
-      }
+      console.log(`solveReference ${cursor + pointer} with refChain ${refChain}`)
 
-      if(!pointer) return processNode(rawJson, parsedJson, cursor, newRefChain)
+      if(!pointer) return processNode(rawJson, parsedJson, cursor, refChain)
 
       return Promise.resolve()
       .then(() => {
@@ -307,7 +330,7 @@ function deref(json, options, pointer = ''){
 
         return Promise.resolve()
         .then(() => {
-          return processNode(rawNode, parsedNode, cursor, newRefChain, prop)
+          return processNode(rawNode, parsedNode, cursor, refChain, prop)
         })
         .then(parsedNode => {
           //

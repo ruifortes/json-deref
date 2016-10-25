@@ -5,8 +5,10 @@
     "fr": "essai multi-langue",
     "de": "Multi-Sprachtest"
   },
-  "title2" : {
-    "pt": "multilang test",
-    "fr": "essai multi-langue"
+  "id" : {
+    "en": "Unique identifier.",
+    "pt": "Identificador único.",
+    "fr": "Identifiant unique.",
+    "de": "Eindeutige Kennung."
   }
 }

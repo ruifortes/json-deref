@@ -15,8 +15,8 @@ var list = [
   'local_forward-pointers',
   'local_deep-forward',
   'external_file',
+  'almost-circular',
   // 'external_circular-file',
-  // 'almost-circular',
   // 'failed-reference',
 ]
 
