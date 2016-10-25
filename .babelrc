@@ -3,7 +3,6 @@
   "plugins": [
     "transform-object-rest-spread",
     "transform-inline-environment-variables",
-    "conditional-compile",
-    "transform-remove-console"
+    "conditional-compile"
   ]
 }

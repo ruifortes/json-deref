@@ -31,12 +31,19 @@ function isCircular(pointer, refChain){
   })
 }
 
-function splitRef($ref) {
-  let [url, pointer = ''] = $ref.split('#')
+// function splitRef($ref) {
+//   let [url, pointer = ''] = $ref.split('#')
+//   if (pointer && !pointer.startsWith('/')) {
+//     pointer = '/' + pointer
+//   }
+//   return [url, pointer]
+// }
+
+function slashPointer(pointer) {
   if (pointer && !pointer.startsWith('/')) {
     pointer = '/' + pointer
   }
-  return [url, pointer]
+  return pointer
 }
 
 
@@ -111,7 +118,7 @@ function deref(json, options, pointer = ''){
   .then(({raw, parsed}) => {
     let jsonResourcesObject = {}
     Object.getOwnPropertyNames(options.jsonResources).forEach(key => {
-      jsonResourcesObject[key] = {raw: options.jsonResources[key], parsed:{} }
+      jsonResourcesObject['json:' + key] = {raw: options.jsonResources[key], parsed:{} }
     })
 
     // add json, options.jsonResources eventually the global cache
@@ -134,6 +141,7 @@ function deref(json, options, pointer = ''){
    */
   function getJsonResource(url, params) {
     return new Promise((accept,reject) => {
+
       const keys = Object.getOwnPropertyNames(jsonCache)
       const index = keys.indexOf(url)
       let cached = jsonCache[url]
@@ -232,8 +240,8 @@ function deref(json, options, pointer = ''){
             // prop is a reference
             else if(sourceValue.hasOwnProperty('$ref')) {
               const {$ref, ...params} = sourceValue
-              // let [url, pointer = ''] = $ref.split('#')
-              const [url, pointer = ''] = splitRef($ref)
+              let [url, pointer = ''] = $ref.split('#')
+              // const [url, pointer = ''] = splitRef($ref)
               const branchRefChain = [...refChain, propCursor]
 
               Promise.resolve()
@@ -248,7 +256,7 @@ function deref(json, options, pointer = ''){
                 if(!url && options.externalOnly){
                   return sourceValue
                 } else {
-                  let ref = `${resourceId}#${pointer}`
+                  let ref = `${resourceId}#${slashPointer(pointer)}`
                   if(isCircular(ref, [propCursor]) || singleProp && isCircular(ref, refChain)) {
                     throw new Error(`pointer ${ref} is circular`)
                   }
@@ -309,7 +317,7 @@ function deref(json, options, pointer = ''){
       return Promise.resolve()
       .then(() => {
         let rawNode = rawJson, parsedNode = parsedJson
-        let tokens = pointer.split('/')
+        let tokens = slashPointer(pointer).split('/')
         tokens.shift() // must remove extra prop created by starting slash
         let prop = tokens[0]
 
@@ -333,7 +341,8 @@ function deref(json, options, pointer = ''){
           return processNode(rawNode, parsedNode, cursor, refChain, prop)
         })
         .then(parsedNode => {
-          //
+          if(!parsedNode) throw new Error(`${cursor}/${prop} of pointer ${pointer} at ${refChain[refChain.length - 1]} did not return object`)
+
           while(parsedNode.hasOwnProperty(tokens[0]) && (parsedNode = parsedNode[tokens[0]])){
             tokens.shift()
           }
@@ -343,7 +352,10 @@ function deref(json, options, pointer = ''){
             throw new Error(`invalid pointer ${pointer} at ${refChain[refChain.length - 1]}`)
           }
         })
-
+        .catch(err => {
+          console.log(err)
+          return Promise.reject(err)
+        })
       })
 
     }

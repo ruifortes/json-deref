@@ -1,6 +1,6 @@
 {
   "name": "json-deref",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "Parses json-references",
   "main": "lib/jsonDeref_node.js",
   "files": [
@@ -9,10 +9,10 @@
   ],
   "scripts": {
     "build": "npm run build:node && npm run build:browser",
-    "build:node": "cross-env BABEL_ENV=node babel index.js -o lib/jsonDeref_node.js --no-comments",
-    "build:browser": "cross-env BABEL_ENV=browser babel index.js -o lib/jsonDeref_web.js --no-comments",
+    "build:node": "cross-env BABEL_ENV=node babel index.js -o lib/jsonDeref_node.js --no-comments --plugins transform-remove-console",
+    "build:browser": "cross-env BABEL_ENV=browser babel index.js -o lib/jsonDeref_web.js --no-comments  --plugins transform-remove-console",
     "test": "tap test/*.js || true",
-    "denode": "cross-env BABEL_ENV=node denode !denode.js"
+    "denode": "cross-env BABEL_ENV=node denode !denode2.js"
   },
   "repository": {
     "type": "git",
