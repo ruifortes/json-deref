@@ -1,10 +1,12 @@
-// import fs from 'fs'
-// import path from 'path'
-if (process.env.BABEL_ENV === "node") {
-  var fs = require('fs')
-  var path = require('path')
-  var fetch = require('isomorphic-fetch')
-}
+import fs from 'fs'
+import path from 'path'
+
+// if (process.env.LIBRARYTARGET !== 'browser') {
+//   var fs = require('fs')
+//   var path = require('path')
+//   var fetch = require('isomorphic-fetch')
+// }
+
 
 // TODO invalidate cache after TTL
 var resourceCache = {}
@@ -21,7 +23,8 @@ var defaultOptions = {
   jsonResources: {}
 }
 
-if (process.env.BABEL_ENV === "node") defaultOptions.basePath = process.cwd()
+// if (process.env.LIBRARYTARGET !== 'browser') defaultOptions.basePath = process.cwd()
+if(fs) defaultOptions.basePath = process.cwd()
 
 //Utility methods
 function isCircular(pointer, refChain){
@@ -30,14 +33,6 @@ function isCircular(pointer, refChain){
     return backRef.startsWith(pointer)
   })
 }
-
-// function splitRef($ref) {
-//   let [url, pointer = ''] = $ref.split('#')
-//   if (pointer && !pointer.startsWith('/')) {
-//     pointer = '/' + pointer
-//   }
-//   return [url, pointer]
-// }
 
 function slashPointer(pointer) {
   if (pointer && !pointer.startsWith('/')) {
@@ -87,7 +82,11 @@ function deref(json, options, pointer = ''){
     }
   }
 
-  if (process.env.BABEL_ENV === "node") {
+  // if (process.env.LIBRARYTARGET !== 'browser') {
+  if (fs) {
+    // var fs = require('fs')
+    // var path = require('path')
+
     defaultLoaders.file = url => {
       return new Promise((accept, reject) => {
         fs.readFile(path.resolve(options.basePath, url), 'utf8', (err, data) => {
@@ -98,14 +97,9 @@ function deref(json, options, pointer = ''){
     }
   }
 
-  // // If 'json' is a string assume an URI.
-  // return ( typeof json !== 'object'
-  //   ? getJsonResource(json, {})
-  //   // : Promise.resolve(Object.assign(jsonCache, {json: {raw: json, parsed: Array.isArray(json) ? [] : {}}}))
-  //   : Promise.resolve(json)
-  // )
   return Promise.resolve()
   .then(() => {
+    // If 'json' is a string assume an URI.
     if(typeof json === 'string'){
       return getJsonResource(json, {})
     } else if(typeof json === 'object'){
@@ -147,8 +141,8 @@ function deref(json, options, pointer = ''){
       let cached = jsonCache[url]
 
       if (cached) {
-        accept({...cached, resourceId: index})
-        // accept(Object.assign({}, cached, {resourceId: index}))
+        // accept({...cached, resourceId: index})
+        accept(Object.assign({}, cached, {resourceId: index}))
       } else {
         // TODO get apropriate loader based on url.
         let defaultLoader
@@ -352,10 +346,6 @@ function deref(json, options, pointer = ''){
             throw new Error(`invalid pointer ${pointer} at ${refChain[refChain.length - 1]}`)
           }
         })
-        .catch(err => {
-          console.log(err)
-          return Promise.reject(err)
-        })
       })
 
     }
@@ -364,10 +354,11 @@ function deref(json, options, pointer = ''){
 
 }
 
+exports.default = deref
 
-// export default deref
-if (process.env.BABEL_ENV === "node") {
-  exports.default = deref
-} else {
-  window.jsonDeref = deref
-}
+// // export default deref
+// if (process.env.BABEL_ENV === "node") {
+//   exports.default = deref
+// } else {
+//   window.jsonDeref = deref
+// }
