@@ -1,6 +1,6 @@
 {
   "name": "json-deref",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "Parses json-references",
   "main": "lib/index.js",
   "files": [

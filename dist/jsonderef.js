@@ -1,4 +1,14 @@
-/******/ (function(modules) { // webpackBootstrap
+(function webpackUniversalModuleDefinition(root, factory) {
+	if(typeof exports === 'object' && typeof module === 'object')
+		module.exports = factory();
+	else if(typeof define === 'function' && define.amd)
+		define("jsonDeref", [], factory);
+	else if(typeof exports === 'object')
+		exports["jsonDeref"] = factory();
+	else
+		root["jsonDeref"] = factory();
+})(this, function() {
+return /******/ (function(modules) { // webpackBootstrap
 /******/ 	// The module cache
 /******/ 	var installedModules = {};
 
@@ -418,13 +428,6 @@
 	}
 
 	exports.default = deref;
-
-	// // export default deref
-	// if (process.env.BABEL_ENV === "node") {
-	//   exports.default = deref
-	// } else {
-	//   window.jsonDeref = deref
-	// }
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1)))
 
 /***/ },
@@ -915,4 +918,6 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1)))
 
 /***/ }
-/******/ ]);
+/******/ ])
+});
+;

@@ -355,10 +355,3 @@ function deref(json, options, pointer = ''){
 }
 
 exports.default = deref
-
-// // export default deref
-// if (process.env.BABEL_ENV === "node") {
-//   exports.default = deref
-// } else {
-//   window.jsonDeref = deref
-// }
