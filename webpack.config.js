@@ -12,9 +12,7 @@ module.exports = config = {
   output: {
     library: 'jsonDeref',
     path: './dist',
-    filename: filename,
-    libraryTarget: 'umd',
-    umdNamedDefine: true,
+    filename: filename
   },
   module: {
     loaders: [
