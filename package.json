@@ -1,6 +1,6 @@
 {
   "name": "json-deref",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "description": "Parses json-references",
   "main": "lib/index.js",
   "files": [
@@ -33,6 +33,7 @@
   "devDependencies": {
     "babel-cli": "^6.16.0",
     "babel-loader": "^6.2.7",
+    "babel-plugin-add-module-exports": "^0.2.1",
     "babel-plugin-conditional-compile": "0.0.5",
     "babel-plugin-transform-inline-environment-variables": "^6.8.0",
     "babel-plugin-transform-object-rest-spread": "^6.16.0",
@@ -42,7 +43,8 @@
     "tap": "^7.1.2"
   },
   "browser": {
-    "fs": "empty"
+    "fs": "empty",
+    "path": "empty"
   },
   "dependencies": {
     "isomorphic-fetch": "^2.2.1"

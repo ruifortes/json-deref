@@ -354,4 +354,4 @@ function deref(json, options, pointer = ''){
 
 }
 
-exports.default = deref
+export default deref
