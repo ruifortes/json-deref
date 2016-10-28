@@ -64,7 +64,7 @@ function deref(json, options, pointer = ''){
   const jsonCache = {}
 
   var defaultLoaders = {
-    web: url => {
+    web: (url, baseUrl) => {
       return fetch(url).then(res => {
         return res.text()
       })
@@ -82,14 +82,10 @@ function deref(json, options, pointer = ''){
     }
   }
 
-  // if (process.env.LIBRARYTARGET !== 'browser') {
   if (fs) {
-    // var fs = require('fs')
-    // var path = require('path')
-
-    defaultLoaders.file = url => {
+    defaultLoaders.file = (url, baseUrl) => {
       return new Promise((accept, reject) => {
-        fs.readFile(path.resolve(options.basePath, url), 'utf8', (err, data) => {
+        fs.readFile(path.resolve(baseUrl, url), 'utf8', (err, data) => {
           if (err) throw err
           accept(JSON.parse(data))
         })
@@ -101,10 +97,15 @@ function deref(json, options, pointer = ''){
   .then(() => {
     // If 'json' is a string assume an URI.
     if(typeof json === 'string'){
-      return getJsonResource(json, {})
+      return getJsonResource(json)
     } else if(typeof json === 'object'){
-      Object.assign(jsonCache, {json: {raw: json, parsed: Array.isArray(json) ? [] : {}}})
-      return jsonCache.json
+      Object.assign(jsonCache, {'json:': {
+          raw: json,
+          parsed: Array.isArray(json) ? [] : {},
+          baseUrl: options.basePath
+        }
+      })
+      return jsonCache['json:']
     } else {
       throw new Error('Invalid param. Must be object, array or string')
     }
@@ -112,7 +113,7 @@ function deref(json, options, pointer = ''){
   .then(({raw, parsed}) => {
     let jsonResourcesObject = {}
     Object.getOwnPropertyNames(options.jsonResources).forEach(key => {
-      jsonResourcesObject['json:' + key] = {raw: options.jsonResources[key], parsed:{} }
+      jsonResourcesObject['json:' + key] = {raw: options.jsonResources[key], parsed:{}, baseUrl: options.basePath}
     })
 
     // add json, options.jsonResources eventually the global cache
@@ -133,34 +134,36 @@ function deref(json, options, pointer = ''){
    * @returns  {Object}
    *           Returns an object containing ray, parsed and id
    */
-  function getJsonResource(url, params) {
+  function getJsonResource(url, baseUrl = options.basePath, params = {}) {
     return new Promise((accept,reject) => {
+      // Get apropriate loader based on url.
+      let key = url, newBaseUrl = url, defaultLoader
+      if(url.startsWith('http://') || url.startsWith('https://')) {
+        defaultLoader = defaultLoaders.web
+      } else if(url.startsWith('json:')) {
+        defaultLoader = defaultLoaders.json
+      } else if(fs) {
+        key = path.resolve(baseUrl, url)
+        newBaseUrl = path.dirname(key)
+        defaultLoader = defaultLoaders.file
+      }
+
+      // const key = baseUrl + '/' + url
 
       const keys = Object.getOwnPropertyNames(jsonCache)
-      const index = keys.indexOf(url)
-      let cached = jsonCache[url]
+      const index = keys.indexOf(key)
+      let cached = jsonCache[key]
 
       if (cached) {
         // accept({...cached, resourceId: index})
         accept(Object.assign({}, cached, {resourceId: index}))
       } else {
-        // TODO get apropriate loader based on url.
-        let defaultLoader
-
-        if(url.startsWith('http://') || url.startsWith('https://')) {
-          defaultLoader = defaultLoaders.web
-        } else if(url.startsWith('json:')) {
-          defaultLoader = defaultLoaders.json
-        } else if(process.env.BABEL_ENV === "node") {
-          defaultLoader = defaultLoaders.file
-        }
-
         return (options.externalLoader
-          ? options.externalLoader(url, params, defaultLoader)
-          : defaultLoader(url)
+          ? options.externalLoader(url, baseUrl, params, defaultLoader)
+          : defaultLoader(url, baseUrl)
         )
         .then(json => {
-          cached = jsonCache[url] = {raw: json , parsed: {}}
+          cached = jsonCache[key] = {raw: json , parsed: {}, baseUrl: newBaseUrl}
           accept({...cached, resourceId: keys.length})
           // accept(Object.assign({}, cached, {resourceId: keys.length}))
         })
@@ -180,6 +183,8 @@ function deref(json, options, pointer = ''){
     * @param {string[]} refChain - Reference chain used to catch circular references
     */
   function processJson(rawJson, parsedJson = {}, resourceId, pointer, params, refChain) {
+    const key = Object.getOwnPropertyNames(jsonCache)[resourceId]
+    const baseUrl = jsonCache[key].baseUrl
 
     if(options.localLoader){
       return options.localLoader(pointer, params, solveReference.bind(this, refChain))
@@ -227,7 +232,7 @@ function deref(json, options, pointer = ''){
               nextProp()
             }
             // Is scalar, just set same and continue
-            else if (typeof sourceValue !== 'object' ) {
+            else if (typeof sourceValue !== 'object' || sourceValue === null) {
               parsedNode[prop] = sourceValue
               nextProp()
             }
@@ -241,7 +246,7 @@ function deref(json, options, pointer = ''){
               Promise.resolve()
               .then(() => {
                 if(url) {
-                  return getJsonResource(url, params)
+                  return getJsonResource(url, baseUrl, params)
                 } else {
                   return {raw: rawJson, parsed: parsedJson, resourceId}
                 }

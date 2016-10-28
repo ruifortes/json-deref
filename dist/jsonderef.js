@@ -134,7 +134,7 @@ var jsonDeref =
 	  var jsonCache = {};
 
 	  var defaultLoaders = {
-	    web: function web(url) {
+	    web: function web(url, baseUrl) {
 	      return fetch(url).then(function (res) {
 	        return res.text();
 	      }).then(function (data) {
@@ -151,14 +151,10 @@ var jsonDeref =
 	    }
 	  };
 
-	  // if (process.env.LIBRARYTARGET !== 'browser') {
 	  if (_fs2.default) {
-	    // var fs = require('fs')
-	    // var path = require('path')
-
-	    defaultLoaders.file = function (url) {
+	    defaultLoaders.file = function (url, baseUrl) {
 	      return new Promise(function (accept, reject) {
-	        _fs2.default.readFile(_path2.default.resolve(options.basePath, url), 'utf8', function (err, data) {
+	        _fs2.default.readFile(_path2.default.resolve(baseUrl, url), 'utf8', function (err, data) {
 	          if (err) throw err;
 	          accept(JSON.parse(data));
 	        });
@@ -169,10 +165,15 @@ var jsonDeref =
 	  return Promise.resolve().then(function () {
 	    // If 'json' is a string assume an URI.
 	    if (typeof json === 'string') {
-	      return getJsonResource(json, {});
+	      return getJsonResource(json);
 	    } else if ((typeof json === 'undefined' ? 'undefined' : _typeof(json)) === 'object') {
-	      Object.assign(jsonCache, { json: { raw: json, parsed: Array.isArray(json) ? [] : {} } });
-	      return jsonCache.json;
+	      Object.assign(jsonCache, { 'json:': {
+	          raw: json,
+	          parsed: Array.isArray(json) ? [] : {},
+	          baseUrl: options.basePath
+	        }
+	      });
+	      return jsonCache['json:'];
 	    } else {
 	      throw new Error('Invalid param. Must be object, array or string');
 	    }
@@ -182,7 +183,7 @@ var jsonDeref =
 
 	    var jsonResourcesObject = {};
 	    Object.getOwnPropertyNames(options.jsonResources).forEach(function (key) {
-	      jsonResourcesObject['json:' + key] = { raw: options.jsonResources[key], parsed: {} };
+	      jsonResourcesObject['json:' + key] = { raw: options.jsonResources[key], parsed: {}, baseUrl: options.basePath };
 	    });
 
 	    // add json, options.jsonResources eventually the global cache
@@ -198,30 +199,37 @@ var jsonDeref =
 	   * @returns  {Object}
 	   *           Returns an object containing ray, parsed and id
 	   */
-	  function getJsonResource(url, params) {
+	  function getJsonResource(url) {
+	    var baseUrl = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : options.basePath;
+	    var params = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
+
 	    return new Promise(function (accept, reject) {
+	      // Get apropriate loader based on url.
+	      var key = url,
+	          newBaseUrl = url,
+	          defaultLoader = void 0;
+	      if (url.startsWith('http://') || url.startsWith('https://')) {
+	        defaultLoader = defaultLoaders.web;
+	      } else if (url.startsWith('json:')) {
+	        defaultLoader = defaultLoaders.json;
+	      } else if (_fs2.default) {
+	        key = _path2.default.resolve(baseUrl, url);
+	        newBaseUrl = _path2.default.dirname(key);
+	        defaultLoader = defaultLoaders.file;
+	      }
+
+	      // const key = baseUrl + '/' + url
 
 	      var keys = Object.getOwnPropertyNames(jsonCache);
-	      var index = keys.indexOf(url);
-	      var cached = jsonCache[url];
+	      var index = keys.indexOf(key);
+	      var cached = jsonCache[key];
 
 	      if (cached) {
 	        // accept({...cached, resourceId: index})
 	        accept(Object.assign({}, cached, { resourceId: index }));
 	      } else {
-	        // TODO get apropriate loader based on url.
-	        var defaultLoader = void 0;
-
-	        if (url.startsWith('http://') || url.startsWith('https://')) {
-	          defaultLoader = defaultLoaders.web;
-	        } else if (url.startsWith('json:')) {
-	          defaultLoader = defaultLoaders.json;
-	        } else if (process.env.BABEL_ENV === "node") {
-	          defaultLoader = defaultLoaders.file;
-	        }
-
-	        return (options.externalLoader ? options.externalLoader(url, params, defaultLoader) : defaultLoader(url)).then(function (json) {
-	          cached = jsonCache[url] = { raw: json, parsed: {} };
+	        return (options.externalLoader ? options.externalLoader(url, baseUrl, params, defaultLoader) : defaultLoader(url, baseUrl)).then(function (json) {
+	          cached = jsonCache[key] = { raw: json, parsed: {}, baseUrl: newBaseUrl };
 	          accept(_extends({}, cached, { resourceId: keys.length }));
 	          // accept(Object.assign({}, cached, {resourceId: keys.length}))
 	        });
@@ -245,6 +253,8 @@ var jsonDeref =
 	    var params = arguments[4];
 	    var refChain = arguments[5];
 
+	    var key = Object.getOwnPropertyNames(jsonCache)[resourceId];
+	    var baseUrl = jsonCache[key].baseUrl;
 
 	    if (options.localLoader) {
 	      return options.localLoader(pointer, params, solveReference.bind(this, refChain));
@@ -293,7 +303,7 @@ var jsonDeref =
 	                nextProp();
 	              }
 	              // Is scalar, just set same and continue
-	              else if ((typeof sourceValue === 'undefined' ? 'undefined' : _typeof(sourceValue)) !== 'object') {
+	              else if ((typeof sourceValue === 'undefined' ? 'undefined' : _typeof(sourceValue)) !== 'object' || sourceValue === null) {
 	                  parsedNode[prop] = sourceValue;
 	                  nextProp();
 	                }
@@ -317,7 +327,7 @@ var jsonDeref =
 
 	                      Promise.resolve().then(function () {
 	                        if (url) {
-	                          return getJsonResource(url, params);
+	                          return getJsonResource(url, baseUrl, params);
 	                        } else {
 	                          return { raw: rawJson, parsed: parsedJson, resourceId: resourceId };
 	                        }
