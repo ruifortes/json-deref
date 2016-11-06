@@ -1,7 +1,7 @@
 var tap = require('tap')
 var test = tap.test
 
-var deref = require('../lib/index.js').default
+var deref = require('../lib/index.js')
 
 var cases = {
   'circular-direct' : {}

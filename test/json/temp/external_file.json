@@ -2,7 +2,7 @@
   "a": 1,
   "b": {
     "a": "ba",
-    "b": {"$ref": "#c/b"}
+    "b": {"$ref": "#/c/b"}
   },
   "c": {"$ref": "local_forward-pointers.json"}
 }

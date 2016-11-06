@@ -3,7 +3,8 @@ var test = tap.test
 
 var fs = require('fs')
 
-var deref = require('../lib/index.js').default
+var deref = require('../lib/index.js')
+var JsonRefs = require('json-refs')
 
 console.log(deref);
 
@@ -26,7 +27,9 @@ list.forEach(name => {
     const input = require(`./json/temp/${name}.json`)
     const expected = require(`./json/temp/${name}.expected.json`)
 
-    deref(input, {basePath: './test/json/temp', failOnMissing:true})
+    // deref(input, {basePath: './test/json/temp', failOnMissing:true})
+    JsonRefs.resolveRefs(input)
+    .then(output => output.resolved)
     .then(output => {
       t.deepEqual(output, expected)
       t.end()
