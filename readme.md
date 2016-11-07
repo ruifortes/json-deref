@@ -139,7 +139,7 @@ Derefs <code>$ref</code>'s in JSON to actual resolved values. Supports local, fi
 | --- | --- | --- |
 | json | <code>Object</code> | The JSON schema |
 | options | <code>Object</code> | options |
-| options.baseFolder | <code>String</code> | the base folder to get relative path files from. Default is <code>process.cwd()</code> |
+| options.basePath | <code>String</code> | The base path. Default is <code>process.cwd()</code> |
 | options.cache | <code>String</code> | whether to cache the result from the request. Default: <code>true</code>. |
 | options.requireStartSlash | <code>boolean</code> | If set requires json-pointer start slash. Default: <code>false</code>. |
 | options.localLoader | <code>function</code> | local pointer loader function with signature <code>function (pointer, params, defaultLoader)</code>. <code>pointer</code> - is the local json-pointer. <code>params</code> - params is the json-reference object without the <code>$ref</code> property. <code>defaultLoader</code> - defaultLoader function accepts a json-pointer string and retrieves the parsed target.|

@@ -85,7 +85,7 @@ function deref(json, options, pointer = ''){
   if (fs) {
     defaultLoaders.file = (url, baseUrl) => {
       return new Promise((accept, reject) => {
-        fs.readFile(path.resolve(baseUrl, url), 'utf8', (err, data) => {
+        fs.readFile(path.resolve(process.cwd(), baseUrl, url), 'utf8', (err, data) => {
           if (err) throw err
           accept(JSON.parse(data))
         })
