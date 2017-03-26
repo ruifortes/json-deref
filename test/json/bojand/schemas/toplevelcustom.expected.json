@@ -1,8 +1,0 @@
-{
-  "type": "object",
-  "properties": {
-    "baz": {
-      "type": "string"
-    }
-  }
-}

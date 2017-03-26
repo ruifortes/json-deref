@@ -1,0 +1,27 @@
+{
+	a: {
+		a: {
+			a: 'val aaa',
+			b: {
+				a: 'val aaba',
+				b: {
+					$ref: '#a/a/a'
+				},
+				c: {
+					$ref: '#a/a/b/a'
+				},
+				d: {
+					$ref: '#a/a/c'
+				}
+			},
+			c: 'val aac'
+		},
+		b: {
+			$ref: '#b/a'
+		}
+	},
+	b: {
+		a: 'val ba',
+		b: 'val bb'
+	}
+}

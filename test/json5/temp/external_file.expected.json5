@@ -1,0 +1,24 @@
+{
+	a: 1,
+	b: {
+		a: 'ba',
+		b: {
+			a: 'val ba',
+			b: 'val bb'
+		}
+	},
+	c: {
+		a: {
+			a: {
+				a: 'val aaa',
+				b: 'val aac',
+				c: 'val aac'
+			},
+			b: 'val ba'
+		},
+		b: {
+			a: 'val ba',
+			b: 'val bb'
+		}
+	}
+}

@@ -1,6 +1,6 @@
 {
   "name": "json-deref",
-  "version": "1.0.19",
+  "version": "1.0.20",
   "description": "Parses json-references",
   "main": "lib/index.js",
   "files": [
@@ -12,8 +12,7 @@
     "dist:web_dev": "cross-env NODE_ENV=development webpack --progress --colors --display-error-details",
     "dist:web_prod": "cross-env NODE_ENV=production webpack --progress --colors --display-error-details",
     "dist:es5": "babel src --out-dir lib --no-comments --plugins transform-remove-console",
-    "test": "tap test/*.js || true",
-    "denode": "cross-env BABEL_ENV=node denode !denode.js"
+    "test": "tap test/*.js || true"
   },
   "repository": {
     "type": "git",
@@ -31,11 +30,9 @@
   },
   "homepage": "https://github.com/ruifortes/json-deref#readme",
   "devDependencies": {
+    "babel-core": "^6.23.1",
     "babel-cli": "^6.16.0",
     "babel-loader": "^6.2.7",
-    "babel-plugin-add-module-exports": "^0.2.1",
-    "babel-plugin-conditional-compile": "0.0.5",
-    "babel-plugin-transform-inline-environment-variables": "^6.8.0",
     "babel-plugin-transform-object-rest-spread": "^6.16.0",
     "babel-plugin-transform-remove-console": "^6.8.0",
     "babel-plugin-transform-runtime": "^6.15.0",
@@ -49,6 +46,7 @@
   },
   "dependencies": {
     "empty": "^0.10.1",
-    "isomorphic-fetch": "^2.2.1"
+    "isomorphic-fetch": "^2.2.1",
+    "whatwg-url": "^4.5.1"
   }
 }

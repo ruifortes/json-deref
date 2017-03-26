@@ -1,0 +1,9 @@
+{
+	a: 'self_A',
+	b: {
+		$ref: 'external_circular-file#b/a'
+	},
+	c: {
+		$ref: 'external_circular-file-self#a'
+	}
+}

@@ -1,0 +1,12 @@
+{
+	a: 1,
+	b: {
+		a: 'ba',
+		b: {
+			$ref: '#c/b'
+		}
+	},
+	c: {
+		$ref: 'nonexisting.json'
+	}
+}

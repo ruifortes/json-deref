@@ -1,46 +1,38 @@
-import fs from 'fs'
-import path from 'path'
+// import whatwgUrl from 'whatwg-url'
+// const URL = whatwgUrl.URL
+// const parseURL = whatwgUrl.parseURL
+// const serializeURL = whatwgUrl.serializeURL
 
-// if (process.env.LIBRARYTARGET !== 'browser') {
-//   var fs = require('fs')
-//   var path = require('path')
-//   var fetch = require('isomorphic-fetch')
-// }
+import parseRef from './parseRef'
+import {isNode, getFile, parseCache, slashPointer} from './util'
 
+var jsonParser = JSON.parse
 
 // TODO invalidate cache after TTL
-var resourceCache = {}
+var globalCache = {}
 
 var defaultOptions = {
-  cache: true,
+  cache: false,
   cacheTTL: 300000, // ms
-  // basePath: process.cwd(),
-  failOnMissing: false,
+  failOnMissing: true,
   externalOnly: false,
-  requireStartSlash: false,
-  localLoader: undefined,
-  externalLoader: undefined,
-  jsonResources: {}
+  skipCircular: false,
+  loaders: {
+    http: url => fetch(url).then(res => res.json()),
+    file: url => getFile(url).then(data => {
+      try {
+        return jsonParser(data)
+      } catch (e) {
+        console.log(`Error parsing schema ${url}`)
+        throw e
+      }
+    }),
+  },
+  baseURL: undefined,
+  vars: {},
+  // jsonParser: JSON.parse,
+  bundle: false
 }
-
-// if (process.env.LIBRARYTARGET !== 'browser') defaultOptions.basePath = process.cwd()
-if(fs) defaultOptions.basePath = process.cwd()
-
-//Utility methods
-function isCircular(pointer, refChain){
-  return refChain.some(backRef => {
-    // return backRef.startsWith(pointer) && backRef !== pointer
-    return backRef.startsWith(pointer)
-  })
-}
-
-function slashPointer(pointer) {
-  if (pointer && !pointer.startsWith('/')) {
-    pointer = '/' + pointer
-  }
-  return pointer
-}
-
 
 
 /**
@@ -50,147 +42,91 @@ function slashPointer(pointer) {
   * @param {Object} options - The employees who are responsible for the project.
   * @param {boolean} [options.failOnMissing = true] - If true unresolved references will throw else just keep $ref unchanged.
   * @param {boolean} [options.externalOnly = true] - If true only external references will be parsed.
-  * @param {string} [pointer=''] - A json-pointer. If provided only parses refered part of the document
   */
-function deref(json, options, pointer = ''){
-  // apply options defaults
-  options =  Object.assign({}, defaultOptions, options)
+function deref(input, _options){
+  _options.loaders = {...defaultOptions.loaders, ..._options.loaders}
+  const options = {...defaultOptions, ..._options}
 
   // validate options
   if(options.localLoader && typeof options.localLoader !== 'function') throw new Error('options.localLoader must be a function')
   if(options.externalLoader && typeof options.externalLoader !== 'function') throw new Error('options.externalLoader must be a function')
 
   // local instance of resource cache object
-  const jsonCache = {}
+  const cache = !options.cache
+    ? {}
+    : typeof options.cache === 'object'
+      ? parseCache(options.cache)
+      : globalCache
 
-  var defaultLoaders = {
-    web: (url, baseUrl) => {
-      return fetch(url).then(res => {
-        return res.text()
-      })
-      .then(data => {
-        return JSON.parse(data)
-      })
-    },
-    json: key => {
-      key = key.substring(5)
-      if(options.jsonResources.hasOwnProperty(key)){
-        return Promise.resolve(options.jsonResources[key])
-      } else {
-        throw new Error(`can't find ${key}`)
-      }
-    }
-  }
-
-  if (fs) {
-    defaultLoaders.file = (url, baseUrl) => {
-      return new Promise((accept, reject) => {
-        fs.readFile(path.resolve(process.cwd(), baseUrl, url), 'utf8', (err, data) => {
-          if (err) throw err
-          accept(JSON.parse(data))
-        })
-      })
-    }
-  }
 
   return Promise.resolve()
   .then(() => {
-    // If 'json' is a string assume an URI.
-    if(typeof json === 'string'){
-      return getJsonResource(json)
-    } else if(typeof json === 'object'){
-      Object.assign(jsonCache, {'json:': {
-          raw: json,
-          parsed: Array.isArray(json) ? [] : {},
-          baseUrl: options.basePath
-        }
-      })
-      return jsonCache['json:']
+    // If 'input' is a string assume an URI.
+    if(typeof input === 'string'){
+      const {url, pointer} = parseRef(input)
+      if(!options.baseURL) {
+        options.baseURL = url
+      }
+      return getJsonResource(url, pointer, undefined, options.externalOnly).then(() => input)
+    } else if(typeof input === 'object'){
+      // if json is supplied assume it overwrites cache entry regardless of options.useCache.
+      // $id must be present and absolute here
+      if(!options.baseURL) {
+        options.baseURL = isNode() ? 'file://' + process.cwd() : ''
+      }
+
+      const resourceId = input.$id || options.baseURL
+      cache[resourceId] = {raw: input}
+      return resourceId
     } else {
       throw new Error('Invalid param. Must be object, array or string')
     }
   })
-  .then(({raw, parsed}) => {
-    let jsonResourcesObject = {}
-    Object.getOwnPropertyNames(options.jsonResources).forEach(key => {
-      jsonResourcesObject['json:' + key] = {raw: options.jsonResources[key], parsed:{}, baseUrl: options.basePath}
-    })
-
-    // add json, options.jsonResources eventually the global cache
-    Object.assign(
-      jsonCache,
-      jsonResourcesObject,
-      (options.cache ? resourceCache : {})
-    )
-
-    return processJson(raw, parsed, 0, pointer, {}, [])
-  })
+  .then(resourceId => processResource(resourceId, undefined, undefined, options.externalOnly))
+  .then(result => options.bundle ? {cache, result} : result)
 
 
   /**
-   * Gets raw and parsed json from cache or external resourceCache
-   *
-   * @param {string} url - ur
-   * @returns  {Object}
-   *           Returns an object containing ray, parsed and id
-   */
-  function getJsonResource(url, baseUrl = options.basePath, params = {}) {
-    return new Promise((accept,reject) => {
-      // Get apropriate loader based on url.
-      let key = url, newBaseUrl = url, defaultLoader
-      if(url.startsWith('http://') || url.startsWith('https://')) {
-        defaultLoader = defaultLoaders.web
-      } else if(url.startsWith('json:')) {
-        defaultLoader = defaultLoaders.json
-      } else if(fs) {
-        key = path.resolve(baseUrl, url)
-        newBaseUrl = path.dirname(key)
-        defaultLoader = defaultLoaders.file
-      }
+  * Gets raw and parsed json from cache
+  *
+  * @param {object} url - uri-js object
+  * @param {object} params - ...rest of the json-reference object
+  * @returns  {Object}
+  *           Returns an object containing raw, parsed and id
+  */
+  function getJsonResource(url) {
 
-      // const key = baseUrl + '/' + url
+    var protocol = url.match(/^(.*?):/)
+    protocol = (protocol && protocol[1]) || 'file'
 
-      const keys = Object.getOwnPropertyNames(jsonCache)
-      const index = keys.indexOf(key)
-      let cached = jsonCache[key]
+    const defaultLoader = defaultOptions.loaders[protocol]
+    const loader = options.loaders[protocol]
 
-      if (cached) {
-        // accept({...cached, resourceId: index})
-        accept(Object.assign({}, cached, {resourceId: index}))
+    return Promise.resolve(cache[url])
+    .then(cached => {
+      if(cached) {
+        return cached
       } else {
-        return (options.externalLoader
-          ? options.externalLoader(url, baseUrl, params, defaultLoader)
-          : defaultLoader(url, baseUrl)
-        )
-        .then(json => {
-          cached = jsonCache[key] = {raw: json , parsed: {}, baseUrl: newBaseUrl}
-          accept({...cached, resourceId: keys.length})
-          // accept(Object.assign({}, cached, {resourceId: keys.length}))
-        })
-
+        return loader(url, defaultLoader)
+          // .then(data => typeof data === 'object' ? data : options.jsonParser(data))
+          .then(json => cache[url] = {raw: json})
       }
     })
   }
-
 
   /**
     * This function mainly serves to scope a single json resource
     *
     * @param {Object} rawJson - The source json
     * @param {Object} parsedJson - Object that holds the parsed properties. Any properties in this object are assumed to be completly parsed
-    * @param {integer} resourceId - Resource id. 'getJsonResource' returns resourceId matching resource cache index (using 'getOwnPropertyNames')
+    * @param {integer} resourceId - Resource id
     * @param {string} pointer - Reference chain used to catch circular references
     * @param {string[]} refChain - Reference chain used to catch circular references
     */
-  function processJson(rawJson, parsedJson = {}, resourceId, pointer, params, refChain) {
-    const key = Object.getOwnPropertyNames(jsonCache)[resourceId]
-    const baseUrl = jsonCache[key].baseUrl
+  function processResource(resourceId, pointer, _refChain=[], externalOnly) {
 
-    if(options.localLoader){
-      return options.localLoader(pointer, params, solveReference.bind(this, refChain))
-    } else {
-      return solveReference(refChain, pointer)
-    }
+    return Promise.resolve(cache[resourceId] || getJsonResource(resourceId))
+      .then(() => solvePointer(pointer, _refChain, resourceId))
 
     /**
       * Main recursive traverse function
@@ -201,8 +137,14 @@ function deref(json, options, pointer = ''){
       * @param {string[]} [refChain=[]] - Parent pointers used to check circular references
       * @param {string} [prop] - If provided returns an object just that prop parsed
       */
-    function processNode(rawNode, parsedNode, cursor, refChain, prop) {
+    function processNode({rawNode, parsedNode, parentId = resourceId, cursor, refChain, prop}) {
+
       console.log(`processNode ${cursor}${prop ? '(' + prop + ')' : ''} with refChain ${refChain}`)
+      // const currentId = rawNode.$id
+      //   ? parseURL(rawNode.$id, parseURL(parentId).href).href
+      //   : parentId
+      const currentId = parentId
+
       const singleProp = !!prop
       const props = singleProp ? [prop] : Object.getOwnPropertyNames(rawNode)
 
@@ -214,7 +156,7 @@ function deref(json, options, pointer = ''){
         function nextProp() {
           propIndex++
 
-          if(propIndex === props.length) {
+          if(propIndex >= props.length) {
             if (singleProp) {
               accept(parsedNode[prop])
             } else {
@@ -237,67 +179,70 @@ function deref(json, options, pointer = ''){
               nextProp()
             }
             // prop is a reference
-            else if(sourceValue.hasOwnProperty('$ref')) {
+            else if(!!sourceValue.$ref) {
+
               const {$ref, ...params} = sourceValue
-              let [url, pointer = ''] = $ref.split('#')
-              // const [url, pointer = ''] = splitRef($ref)
+
+              // const _url = new URL($ref, currentId)
+              // const url = _url.origin + _url.pathname
+              // const pointer = _url.hash
+              // const isLocalRef = currentId === url
               const branchRefChain = [...refChain, propCursor]
 
-              Promise.resolve()
-              .then(() => {
-                if(url) {
-                  return getJsonResource(url, baseUrl, params)
-                } else {
-                  return {raw: rawJson, parsed: parsedJson, resourceId}
-                }
-              })
-              .then(({raw, parsed, resourceId}) => {
-                if(!url && options.externalOnly){
-                  return sourceValue
-                } else {
-                  let ref = `${resourceId}#${slashPointer(pointer)}`
-                  if(isCircular(ref, [propCursor]) || singleProp && isCircular(ref, refChain)) {
-                    throw new Error(`pointer ${ref} is circular`)
-                  }
-                  return processJson(raw, parsed, resourceId, pointer, params, branchRefChain)
-                }
-              })
-              .then(newValue => {
-                nodeChanged = 1
-                parsedNode[prop] = newValue
+              const {url, pointer, isLocalRef, isCircular} = parseRef($ref, currentId, branchRefChain, options.vars)
+
+              if(isCircular && options.skipCircular || isLocalRef && externalOnly) {
+              // if(isLocalRef && externalOnly) {
+                parsedNode[prop] = sourceValue
                 nextProp()
-              })
-              .catch(err => {
-                if (options.failOnMissing) {
-                  reject(err)
-                } else {
-                  parsedNode[prop] = sourceValue
+              } else {
+                Promise.resolve(isLocalRef
+                  ? solvePointer(pointer, branchRefChain, currentId)
+                  : externalOnly && pointer
+                   ? processResource(url, pointer, branchRefChain, false)
+                   : processResource(url, pointer, branchRefChain)
+                )
+                .then(newValue => {
+                  nodeChanged = 1
+                  parsedNode[prop] = newValue
                   nextProp()
-                }
-              })
-            }
-            // prop is object
-            else {
+                })
+                .catch(err => {
+                  const log = `Error derefing ${cursor}/${prop}`
+                  if (options.failOnMissing) {
+                    reject(log)
+                  } else {
+                    console.log(log)
+                    parsedNode[prop] = sourceValue
+                    nextProp()
+                  }
+                })
+
+              }
+
+            } else {
               const placeholder = parsedNode[prop] = Array.isArray(sourceValue) ? [] : {}
-              processNode(sourceValue, placeholder, propCursor, refChain)
+              processNode({
+                rawNode: sourceValue,
+                parsedNode: placeholder,
+                parentId: currentId,
+                cursor: propCursor,
+                refChain
+              })
               .then(newValue => {
                 nodeChanged |= newValue !== sourceValue
                 nextProp()
               })
               .catch(reject)
             }
-
           }
-
         }
-
       })
     }
 
-
     /**
-      * Resolves a reference and pointer and returns the result.
-      * State is updates in the recursion but result must be explicitly added.
+      * Resolves a "local" reference and pointer and returns the result.
+      * State is updated in the recursion but result must be explicitly added.
       * It doesn't use placeholder object/array because result can be a scalar
       * Also rawNode and parsedNode aren't used since it always use the root node from state
       *
@@ -305,58 +250,72 @@ function deref(json, options, pointer = ''){
       * @param {string[]} refChain - Parent pointers used to check circular references
       *
       */
-    function solveReference(refChain, pointer) {
-      // cursor is updated in pointer prop iteration and passed to processNode
-      let cursor = resourceId + '#'
+    function solvePointer(pointer = '#', refChain, parentId) {
+      pointer = pointer.replace('#', '')
+      let cursor = resourceId + '#' + pointer
+      console.log(`solvePointer ${cursor} with refChain ${refChain}`)
 
-      console.log(`solveReference ${cursor + pointer} with refChain ${refChain}`)
+      let tokens = slashPointer(pointer).split('/').slice(1)
 
-      if(!pointer) return processNode(rawJson, parsedJson, cursor, refChain)
+      const resource = cache[resourceId]
+      let {raw: rawNode, parsed: parsedNode} = resource
+      let prop = tokens[0]
 
-      return Promise.resolve()
-      .then(() => {
-        let rawNode = rawJson, parsedNode = parsedJson
-        let tokens = slashPointer(pointer).split('/')
-        tokens.shift() // must remove extra prop created by starting slash
-        let prop = tokens[0]
+      // undefined resource.parsed means it's initial call from processResource
+      // and not a reference from processNode
+      if(parsedNode && !prop) {
+        // the following doesn't work if a previous reference to resource was made and
+        // it included local pointer because parsedNode would be incomplete
+        return parsedNode //its a ref to schema
+        // return processNode({rawNode, parsedNode, parentId, cursor, refChain})
+      } else if (!parsedNode) {
+        //its initial call. Having parsed object marks it as initialized.
+        // subsquent calls with empty pointer will just get reference to parsed
+        parsedNode = resource.parsed = {}
+        if (!prop) {
+          return processNode({rawNode, parsedNode, parentId, cursor, refChain})
+        }
+      }
 
+      // if(!parsedNode) parsedNode = resource.parsed = {}
+      // if (!prop) processNode({rawNode, parsedNode, parentId, cursor, refChain})
+
+      return iterate(rawNode, parsedNode, tokens)
+
+      function iterate(rawNode, parsedNode, tokens) {
         // remove tokens to already parsed objects (also build cursor string)
-        while (parsedNode.hasOwnProperty(prop)) {
-          rawNode = rawNode[prop]
+        while (parsedNode.hasOwnProperty(prop = tokens[0])) {
+          rawNode = rawNode && rawNode[prop] //rawNode may be undefined when iterating a deep ref
           parsedNode = parsedNode[prop]
-          cursor += '/' + tokens.shift()
-          prop = tokens[0]
+          tokens.shift()
+          cursor += '/' + prop
         }
 
-        // if all path is parsed return value
         if(!tokens.length){
           return parsedNode
         }
 
-        prop = tokens.shift()
+        tokens.shift()
 
-        return Promise.resolve()
-        .then(() => {
-          return processNode(rawNode, parsedNode, cursor, refChain, prop)
-        })
-        .then(parsedNode => {
-          if(!parsedNode) throw new Error(`${cursor}/${prop} of pointer ${pointer} at ${refChain[refChain.length - 1]} did not return object`)
-
-          while(parsedNode.hasOwnProperty(tokens[0]) && (parsedNode = parsedNode[tokens[0]])){
-            tokens.shift()
-          }
-          if(!tokens.length){
-            return parsedNode
-          } else {
-            throw new Error(`invalid pointer ${pointer} at ${refChain[refChain.length - 1]}`)
-          }
-        })
-      })
+        return processNode({rawNode, parsedNode, parentId, cursor, refChain, prop})
+          .then(value => {
+            if(!value) {
+              throw new Error(`${cursor}/${prop} of pointer ${pointer} at ${refChain[refChain.length - 1]} did not return object`)
+            } else if (!tokens.length) {
+              return value
+            } else if(typeof value == 'object'){
+              // return solvePointer('#/' + tokens.join('/'), refChain, parentId)
+              return iterate(rawNode[prop], value, tokens)
+            }
+          })
+      }
 
     }
 
   }
 
 }
+
+deref.setJsonParser = parser => jsonParser = parser
 
 export default deref

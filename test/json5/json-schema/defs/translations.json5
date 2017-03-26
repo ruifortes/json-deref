@@ -1,0 +1,14 @@
+{
+	title: {
+		en: 'multi language test',
+		pt: 'multilang test',
+		fr: 'essai multi-langue',
+		de: 'Multi-Sprachtest'
+	},
+	id: {
+		en: 'Unique identifier.',
+		pt: 'Identificador único.',
+		fr: 'Identifiant unique.',
+		de: 'Eindeutige Kennung.'
+	}
+}
