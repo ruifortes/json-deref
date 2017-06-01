@@ -1,6 +1,6 @@
 {
   "name": "json-deref",
-  "version": "1.0.20",
+  "version": "1.1.00",
   "description": "Parses json-references",
   "main": "lib/index.js",
   "files": [
@@ -12,7 +12,7 @@
     "dist:web_dev": "cross-env NODE_ENV=development webpack --progress --colors --display-error-details",
     "dist:web_prod": "cross-env NODE_ENV=production webpack --progress --colors --display-error-details",
     "dist:es5": "babel src --out-dir lib --no-comments --plugins transform-remove-console",
-    "test": "tap test/*.js || true"
+    "test": "cross-env DEBUG=json-deref:error tap tests/*.test.js || true"
   },
   "repository": {
     "type": "git",
@@ -45,6 +45,7 @@
     "path": "empty"
   },
   "dependencies": {
+    "debug": "^2.6.3",
     "empty": "^0.10.1",
     "isomorphic-fetch": "^2.2.1",
     "whatwg-url": "^4.5.1"

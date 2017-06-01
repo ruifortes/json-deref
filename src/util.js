@@ -6,7 +6,7 @@ export const isNode = new Function("try {return this===global;}catch(e){return f
 export function getFile(url, extList = ['json', 'json5']) {
   var filePath = url.replace(/^file:\/\//,'').replace(/\.[^/.]+$/, '')
   filePath = filePath.split("?")[0].split("#")[0]
-  
+
   // var filePath = url.pathname.replace(/\.[^/.]+$/, '')
 
   if(filePath.indexOf(':') != -1) {
@@ -28,7 +28,8 @@ export function getFile(url, extList = ['json', 'json5']) {
         } else if (i < extList.length) {
           tryPath(`${filePath}.${extList[i++]}`)
         } else {
-          reject(`File ${filePath} not found`)
+          console.log(`File ${url} not found`)
+          reject(`File ${url} not found`)
         }
       })
     }
@@ -40,7 +41,8 @@ export function parseCache(obj) {
   const result = {}
   Object.getOwnPropertyNames(obj).map(key =>{
     result[key] = {
-      raw: obj[key]
+      raw: obj[key],
+      parsed: {}
     }
   })
   return result

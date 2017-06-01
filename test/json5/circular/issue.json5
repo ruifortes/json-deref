@@ -1,0 +1,8 @@
+{
+  id: 'http://localhost:1234/schema.json',
+  properties: {
+    'int': {
+      $ref: 'definitions.json#/refToInteger'
+    }
+  }
+}

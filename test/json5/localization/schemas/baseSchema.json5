@@ -1,0 +1,11 @@
+{
+	id: 'http://example.net/root.json',
+	title: 'Root',
+  descriptions: 'Root schema for localization testing'
+	type: 'object',
+  properties: {
+    foo: {
+      type: 'object'
+    }
+  }
+}

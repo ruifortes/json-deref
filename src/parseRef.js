@@ -3,16 +3,20 @@ const parseURL = whatwgUrl.parseURL
 const URL = whatwgUrl.URL
 const serializeURL = whatwgUrl.serializeURL
 
-function replaceVars(text, vars) {
-  // const re = new RegExp(`{(${Object.getOwnPropertyNames(vars).join('|')})}`)
-  Object.getOwnPropertyNames(vars).forEach(key => {
-    text = text.replace(`{${key}}`, vars[key])
-  })
-  return text
-}
+// function replaceVars(text, vars) {
+//   // const re = new RegExp(`{(${Object.getOwnPropertyNames(vars).join('|')})}`)
+//   Object.getOwnPropertyNames(vars).forEach(key => {
+//     text = text.replace(`{${key}}`, vars[key])
+//   })
+//   return text
+// }
 
 export default function parseRef($ref, currentId, refChain = [], vars = {}) {
-  const _url = new URL(replaceVars($ref, vars), currentId)
+  // const _url = new URL(replaceVars($ref, vars), currentId !== '' ? currentId : undefined)
+
+  const _url = new URL($ref, currentId !== '' ? currentId : undefined)
+  if(_url.origin === 'null') return {url: null}
+
   const url = _url.origin + _url.pathname + _url.search
   const pointer = _url.hash
   const isLocalRef = currentId === url
@@ -35,14 +39,9 @@ export default function parseRef($ref, currentId, refChain = [], vars = {}) {
       const internallyCircular = backRef_frag.startsWith(ref_frag)
 
       return externallyCircular && internallyCircular
-      // return ref_urlRecord.path.every((token, i) => {
-      //   return token === backRef_urlRecord.path[i]
-      // }) && (
-      //   (backRef_urlRecord.fragment || '').startsWith(ref_urlRecord.fragment || '')
-      // )
     })
 
   }
 
-  return {url, pointer, isLocalRef, isCircular}
+  return {url, pointer, isLocalRef, isCircular, fullUrl: url + pointer}
 }

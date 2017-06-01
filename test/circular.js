@@ -6,8 +6,16 @@ var JSON5 = require('json5')
 var tap = require('tap')
 var test = tap.test
 
-// var deref = require('../lib/index.js')
 var deref = require('../src/index.js').default
+var slashPointer = require('../src/util.js').slashPointer
+
+deref.setJsonParser(JSON5.parse)
+
+function fileUrl(str) {
+    var pathName = path.resolve(str).replace(/\\/g, '/');
+    if (pathName[0] !== '/') pathName = '/' + pathName
+    return encodeURI('file://' + pathName)
+}
 
 var list = {
   indirect: (t, output) => {
@@ -22,15 +30,14 @@ var list = {
   // },
 }
 
-const baseURI = 'file:///' + path.resolve(__dirname, 'json5/circular/')
+const basePath = path.resolve(__dirname, './json5/circular/')
+const baseURL = fileUrl(basePath)
 
 const name = 'indirect'
 const input = require(`./json5/circular/${name}.json5`)
 
 deref(input, {
   failOnMissing:true,
-  baseURI: baseURI + '/' + name,
-  jsonParser: JSON5.parse,
   skipCircular: true
 })
 .then(output => {
